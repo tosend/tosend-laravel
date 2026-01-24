@@ -2,12 +2,14 @@
 
 namespace ToSend\Laravel\Mail;
 
+use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\MessageConverter;
 use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\RawMessage;
 use ToSend\Laravel\Contracts\ToSendClient;
 use ToSend\Laravel\Data\Attachment;
 use ToSend\Laravel\Exceptions\ToSendException;
@@ -23,6 +25,19 @@ class ToSendTransport extends AbstractTransport
 
         $this->client = $client;
         $this->defaultFrom = $defaultFrom;
+    }
+
+    public function send(RawMessage $message, ?Envelope $envelope = null): ?SentMessage
+    {
+        // Set default from address if not provided
+        if ($message instanceof Email && empty($message->getFrom()) && !empty($this->defaultFrom['address'])) {
+            $message->from(new Address(
+                $this->defaultFrom['address'],
+                $this->defaultFrom['name'] ?? ''
+            ));
+        }
+
+        return parent::send($message, $envelope);
     }
 
     protected function doSend(SentMessage $message): void

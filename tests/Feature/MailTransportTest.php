@@ -65,7 +65,9 @@ class MailTransportTest extends TestCase
             ->subject('Test')
             ->html('<p>Hi</p>');
 
-        $transport->send($email);
+        $sentMessage = $transport->send($email);
+
+        $this->assertNotNull($sentMessage);
     }
 
     public function test_transport_includes_cc_and_bcc(): void
@@ -91,7 +93,9 @@ class MailTransportTest extends TestCase
             ->subject('Test')
             ->html('<p>Hi</p>');
 
-        $transport->send($email);
+        $sentMessage = $transport->send($email);
+
+        $this->assertNotNull($sentMessage);
     }
 
     public function test_transport_includes_reply_to(): void
@@ -114,7 +118,9 @@ class MailTransportTest extends TestCase
             ->subject('Test')
             ->html('<p>Hi</p>');
 
-        $transport->send($email);
+        $sentMessage = $transport->send($email);
+
+        $this->assertNotNull($sentMessage);
     }
 
     public function test_transport_includes_text_content(): void
@@ -135,7 +141,9 @@ class MailTransportTest extends TestCase
             ->subject('Test')
             ->text('Plain text content');
 
-        $transport->send($email);
+        $sentMessage = $transport->send($email);
+
+        $this->assertNotNull($sentMessage);
     }
 
     public function test_transport_string_representation(): void
