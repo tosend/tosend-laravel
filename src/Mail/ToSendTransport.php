@@ -27,7 +27,7 @@ class ToSendTransport extends AbstractTransport
         $this->defaultFrom = $defaultFrom;
     }
 
-    public function send(RawMessage $message, Envelope $envelope = null): SentMessage
+    public function send(RawMessage $message, ?Envelope $envelope = null): SentMessage
     {
         // Set default from address if not provided
         if ($message instanceof Email && empty($message->getFrom()) && !empty($this->defaultFrom['address'])) {
