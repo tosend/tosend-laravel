@@ -5,7 +5,7 @@ Official Laravel SDK for the [ToSend](https://tosend.com) email API.
 ## Requirements
 
 - PHP 8.1 or higher
-- Laravel 10.x or 11.x
+- Laravel 10.x, 11.x, or 12.x
 
 ## Installation
 
