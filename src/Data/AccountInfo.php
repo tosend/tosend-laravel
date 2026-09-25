@@ -2,34 +2,51 @@
 
 namespace ToSend\Laravel\Data;
 
+/**
+ * GET /v2/info with a sending key.
+ */
 class AccountInfo
 {
     /**
      * @param Domain[] $domains
      */
     public function __construct(
-        public readonly string $title,
-        public readonly string $planType,
+        public readonly int $id,
         public readonly string $status,
-        public readonly int $emailsUsageThisMonth,
-        public readonly int $emailsSentLast24Hours,
+        public readonly string $planType,
+        /** Remaining credits. Null means the account does not consume credits. */
+        public readonly ?int $creditBalance,
+        public readonly int $monthlyEmailLimit,
+        public readonly int $limitPerSecond,
+        public readonly string $sesRegion,
+        /** Fraction between 0 and 1, not a percentage. */
+        public readonly float $bounceRate,
+        /** Fraction between 0 and 1, not a percentage. */
+        public readonly float $complaintRate,
+        public readonly string $sesStatus,
         public readonly array $domains
     ) {}
 
     public static function fromArray(array $data): self
     {
         $account = $data['account'] ?? [];
+
         $domains = array_map(
             fn($d) => Domain::fromArray($d),
             $data['domains'] ?? []
         );
 
         return new self(
-            title: $account['title'] ?? '',
-            planType: $account['plan_type'] ?? '',
-            status: $account['status'] ?? '',
-            emailsUsageThisMonth: $account['emails_usage_this_month'] ?? 0,
-            emailsSentLast24Hours: $account['emails_sent_last_24hrs'] ?? 0,
+            id: (int) ($account['id'] ?? 0),
+            status: (string) ($account['status'] ?? ''),
+            planType: (string) ($account['plan_type'] ?? ''),
+            creditBalance: isset($account['credit_balance']) ? (int) $account['credit_balance'] : null,
+            monthlyEmailLimit: (int) ($account['monthly_email_limit'] ?? 0),
+            limitPerSecond: (int) ($account['limit_per_second'] ?? 0),
+            sesRegion: (string) ($account['ses_region'] ?? ''),
+            bounceRate: (float) ($account['bounce_rate'] ?? 0),
+            complaintRate: (float) ($account['complaint_rate'] ?? 0),
+            sesStatus: (string) ($account['ses_status'] ?? ''),
             domains: $domains
         );
     }
@@ -49,57 +66,25 @@ class AccountInfo
      */
     public function verifiedDomains(): array
     {
-        return array_filter($this->domains, fn($d) => $d->isVerified());
+        return array_values(array_filter($this->domains, fn($d) => $d->isVerified()));
     }
 
     public function toArray(): array
     {
         return [
             'account' => [
-                'title' => $this->title,
-                'plan_type' => $this->planType,
+                'id' => $this->id,
                 'status' => $this->status,
-                'emails_usage_this_month' => $this->emailsUsageThisMonth,
-                'emails_sent_last_24hrs' => $this->emailsSentLast24Hours,
+                'plan_type' => $this->planType,
+                'credit_balance' => $this->creditBalance,
+                'monthly_email_limit' => $this->monthlyEmailLimit,
+                'limit_per_second' => $this->limitPerSecond,
+                'ses_region' => $this->sesRegion,
+                'bounce_rate' => $this->bounceRate,
+                'complaint_rate' => $this->complaintRate,
+                'ses_status' => $this->sesStatus,
             ],
             'domains' => array_map(fn($d) => $d->toArray(), $this->domains),
-        ];
-    }
-}
-
-class Domain
-{
-    public function __construct(
-        public readonly string $domainName,
-        public readonly string $verificationStatus,
-        public readonly string $createdAt
-    ) {}
-
-    public static function fromArray(array $data): self
-    {
-        return new self(
-            domainName: $data['domain_name'] ?? '',
-            verificationStatus: $data['verification_status'] ?? '',
-            createdAt: $data['created_at'] ?? ''
-        );
-    }
-
-    public function isVerified(): bool
-    {
-        return $this->verificationStatus === 'verified';
-    }
-
-    public function isPending(): bool
-    {
-        return $this->verificationStatus === 'pending';
-    }
-
-    public function toArray(): array
-    {
-        return [
-            'domain_name' => $this->domainName,
-            'verification_status' => $this->verificationStatus,
-            'created_at' => $this->createdAt,
         ];
     }
 }

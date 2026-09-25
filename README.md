@@ -33,6 +33,7 @@ php artisan vendor:publish --tag=tosend-config
 // config/tosend.php
 return [
     'api_key' => env('TOSEND_API_KEY'),
+    'admin_key' => env('TOSEND_ADMIN_KEY'), // optional, only for the Admin API client
     'api_url' => env('TOSEND_API_URL', 'https://api.tosend.com'),
     'from' => [
         'address' => env('TOSEND_FROM_ADDRESS'),
@@ -142,9 +143,11 @@ use ToSend\Laravel\Facades\ToSend;
 
 $info = ToSend::getAccountInfo();
 
-echo $info->title;
-echo $info->emailsUsageThisMonth;
-echo $info->emailsSentLast24Hours;
+echo $info->id;
+echo $info->status;           // 'active'
+echo $info->creditBalance;    // null means the account does not consume credits
+echo $info->limitPerSecond;
+echo $info->bounceRate;       // a fraction between 0 and 1, not a percentage
 
 foreach ($info->domains as $domain) {
     echo $domain->domainName . ': ' . $domain->verificationStatus;
@@ -153,6 +156,43 @@ foreach ($info->domains as $domain) {
 // Get only verified domains
 $verified = $info->verifiedDomains();
 ```
+
+## Admin API
+
+`ToSend\Laravel\ToSendAdmin` is a separate client for the [Admin API](https://tosend.com/docs/api/admin-api). It takes an admin key (`tsend_admin_...`) and refuses a sending key at construction. Each call needs the matching [scope](https://tosend.com/docs/api/admin-api#scopes) on the key; a missing one throws a `403` whose `getErrorCode()` is `insufficient_scope`.
+
+Admin keys are created on your main account in the dashboard, under **API Keys** → **Admin API**. Add yours to `.env`:
+
+```env
+TOSEND_ADMIN_KEY=tsend_admin_your_key
+```
+
+```php
+use ToSend\Laravel\ToSendAdmin;
+
+$admin = app(ToSendAdmin::class);
+
+// Act on one of your client teams (sends X-Account-Id)
+$client = $admin->forAccount(4203);
+
+$domain = $client->createDomain('client.example.com');
+$detail = $client->getDomain($domain['id']);
+print_r($detail['dns_records']['dkim']); // show these records to your client
+
+// Needs api_keys:write and emails:send
+$key = $client->createSendingKey('Client: Acme Corp');
+echo $key['api_key']; // returned once, store it now
+
+// Needs emails:send
+$client->send([
+    'from'    => ['email' => 'hello@client.example.com'],
+    'to'      => [['email' => 'user@example.com']],
+    'subject' => 'Hi',
+    'html'    => '<p>Hello</p>',
+]);
+```
+
+Also available: `getInfo`, `listDomains`, `deleteDomain`, `listEmails`, `getEmail`, `listSuppressions`, `deleteSuppression`, `listWebhooks`, `createWebhook`, `updateWebhook`, `deleteWebhook`, `listSendingKeys`, `deleteSendingKey`, `listTeams`, `createTeam`, `updateTeam` and `batch`. List methods take `page` and `per_page` and return `data`, `total`, `page` and `per_page`. Resolving `ToSendAdmin` without `TOSEND_ADMIN_KEY` set throws a `ToSendException`; the sending client is unaffected.
 
 ## Laravel Mail Integration
 

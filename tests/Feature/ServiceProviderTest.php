@@ -4,6 +4,8 @@ namespace ToSend\Laravel\Tests\Feature;
 
 use ToSend\Laravel\Tests\TestCase;
 use ToSend\Laravel\ToSend;
+use ToSend\Laravel\ToSendAdmin;
+use ToSend\Laravel\Exceptions\ToSendException;
 use ToSend\Laravel\Contracts\ToSendClient;
 use ToSend\Laravel\Facades\ToSend as ToSendFacade;
 
@@ -37,6 +39,26 @@ class ServiceProviderTest extends TestCase
         $this->assertEquals('https://api.tosend.com', config('tosend.api_url'));
         $this->assertEquals('test@example.com', config('tosend.from.address'));
         $this->assertEquals('Test Sender', config('tosend.from.name'));
+    }
+
+    public function test_admin_client_resolves_when_a_key_is_configured(): void
+    {
+        config(['tosend.admin_key' => 'tsend_admin_0123456789abcdef0123456789abcdef']);
+
+        $this->assertInstanceOf(ToSendAdmin::class, $this->app->make(ToSendAdmin::class));
+    }
+
+    public function test_admin_client_without_a_key_fails_clearly_only_when_resolved(): void
+    {
+        config(['tosend.admin_key' => null]);
+
+        // The app booted and the sending client still works.
+        $this->assertInstanceOf(ToSend::class, $this->app->make(ToSendClient::class));
+
+        $this->expectException(ToSendException::class);
+        $this->expectExceptionMessage('TOSEND_ADMIN_KEY');
+
+        $this->app->make(ToSendAdmin::class);
     }
 
     public function test_mail_transport_is_registered(): void

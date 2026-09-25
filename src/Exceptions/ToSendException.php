@@ -78,12 +78,25 @@ class ToSendException extends Exception
      */
     public static function fromResponse(array $response, int $statusCode): self
     {
+        // `errors` is nested on the sending API ({"subject": {"required": "..."}})
+        // and flat on the Admin API ({"code": "insufficient_scope", ...}). The
+        // Admin API also sends no error_type, which then falls back to one
+        // derived from the status code.
         return new self(
-            message: $response['message'] ?? 'Unknown error',
+            message: is_string($response['message'] ?? null) ? $response['message'] : 'Unknown error',
             code: $statusCode,
-            errors: $response['errors'] ?? [],
-            errorType: $response['error_type'] ?? ''
+            errors: is_array($response['errors'] ?? null) ? $response['errors'] : [],
+            errorType: is_string($response['error_type'] ?? null) ? $response['error_type'] : ''
         );
+    }
+
+    /**
+     * The machine-readable code the Admin API puts in `errors.code`
+     * (for example `insufficient_scope` or `suspended_by_platform`), if any.
+     */
+    public function getErrorCode(): ?string
+    {
+        return is_string($this->errors['code'] ?? null) ? $this->errors['code'] : null;
     }
 
     /**

@@ -8,31 +8,77 @@ use ToSend\Laravel\Data\Domain;
 
 class AccountInfoTest extends TestCase
 {
-    public function test_creates_from_array(): void
+    /** The exact shape GET /v2/info returns for a sending key. */
+    private function realResponse(): array
     {
-        $info = AccountInfo::fromArray([
+        return [
             'account' => [
-                'title' => 'My Account',
-                'plan_type' => 'pro',
+                'id' => 142,
                 'status' => 'active',
-                'emails_usage_this_month' => 1000,
-                'emails_sent_last_24hrs' => 50,
+                'plan_type' => 'pro',
+                'credit_balance' => 48750,
+                'monthly_email_limit' => 100000,
+                'limit_per_second' => 14,
+                'ses_region' => 'us-east-1',
+                'bounce_rate' => 0.012,
+                'complaint_rate' => 0.0003,
+                'ses_status' => 'healthy',
             ],
             'domains' => [
                 [
-                    'domain_name' => 'example.com',
+                    'id' => 88,
+                    'domain_name' => 'acme.com',
                     'verification_status' => 'verified',
-                    'created_at' => '2024-01-01 00:00:00',
+                    'is_default' => 1,
+                    'total_sent' => 24189,
+                    'total_bounced' => 212,
+                    'total_complained' => 7,
+                ],
+                [
+                    'id' => 112,
+                    'domain_name' => 'mail.acme.com',
+                    'verification_status' => 'pending',
+                    'is_default' => 0,
+                    'total_sent' => 0,
+                    'total_bounced' => 0,
+                    'total_complained' => 0,
                 ],
             ],
-        ]);
+        ];
+    }
 
-        $this->assertEquals('My Account', $info->title);
-        $this->assertEquals('pro', $info->planType);
-        $this->assertEquals('active', $info->status);
-        $this->assertEquals(1000, $info->emailsUsageThisMonth);
-        $this->assertEquals(50, $info->emailsSentLast24Hours);
-        $this->assertCount(1, $info->domains);
+    public function test_creates_from_the_real_response(): void
+    {
+        $info = AccountInfo::fromArray($this->realResponse());
+
+        $this->assertSame(142, $info->id);
+        $this->assertSame('active', $info->status);
+        $this->assertSame('pro', $info->planType);
+        $this->assertSame(48750, $info->creditBalance);
+        $this->assertSame(100000, $info->monthlyEmailLimit);
+        $this->assertSame(14, $info->limitPerSecond);
+        $this->assertSame('us-east-1', $info->sesRegion);
+        $this->assertSame(0.012, $info->bounceRate);
+        $this->assertSame(0.0003, $info->complaintRate);
+        $this->assertSame('healthy', $info->sesStatus);
+        $this->assertCount(2, $info->domains);
+
+        $domain = $info->domains[0];
+        $this->assertSame(88, $domain->id);
+        $this->assertSame('acme.com', $domain->domainName);
+        $this->assertTrue($domain->isDefault);
+        $this->assertSame(24189, $domain->totalSent);
+        $this->assertSame(212, $domain->totalBounced);
+        $this->assertSame(7, $domain->totalComplained);
+        $this->assertFalse($info->domains[1]->isDefault);
+    }
+
+    public function test_null_credit_balance_means_unlimited(): void
+    {
+        $data = $this->realResponse();
+        $data['account']['credit_balance'] = null;
+
+        $this->assertNull(AccountInfo::fromArray($data)->creditBalance);
     }
 
     public function test_is_active(): void
@@ -57,36 +103,21 @@ class AccountInfoTest extends TestCase
 
     public function test_verified_domains(): void
     {
-        $info = AccountInfo::fromArray([
-            'account' => [],
-            'domains' => [
-                ['domain_name' => 'verified.com', 'verification_status' => 'verified', 'created_at' => ''],
-                ['domain_name' => 'pending.com', 'verification_status' => 'pending', 'created_at' => ''],
-                ['domain_name' => 'also-verified.com', 'verification_status' => 'verified', 'created_at' => ''],
-            ],
-        ]);
+        $info = AccountInfo::fromArray($this->realResponse());
 
         $verified = $info->verifiedDomains();
 
-        $this->assertCount(2, $verified);
+        $this->assertCount(1, $verified);
+        $this->assertSame('acme.com', $verified[0]->domainName);
     }
 
-    public function test_to_array(): void
+    public function test_to_array_round_trips(): void
     {
-        $info = new AccountInfo(
-            title: 'Test',
-            planType: 'free',
-            status: 'active',
-            emailsUsageThisMonth: 100,
-            emailsSentLast24Hours: 10,
-            domains: []
-        );
+        $data = $this->realResponse();
+        $data['domains'][0]['is_default'] = true;
+        $data['domains'][1]['is_default'] = false;
 
-        $array = $info->toArray();
-
-        $this->assertArrayHasKey('account', $array);
-        $this->assertArrayHasKey('domains', $array);
-        $this->assertEquals('Test', $array['account']['title']);
+        $this->assertEquals($data, AccountInfo::fromArray($this->realResponse())->toArray());
     }
 }
 
@@ -95,19 +126,25 @@ class DomainTest extends TestCase
     public function test_creates_from_array(): void
     {
         $domain = Domain::fromArray([
+            'id' => 5,
             'domain_name' => 'example.com',
             'verification_status' => 'verified',
-            'created_at' => '2024-01-01 00:00:00',
+            'is_default' => 0,
+            'total_sent' => 3,
+            'total_bounced' => 1,
+            'total_complained' => 0,
         ]);
 
-        $this->assertEquals('example.com', $domain->domainName);
-        $this->assertEquals('verified', $domain->verificationStatus);
-        $this->assertEquals('2024-01-01 00:00:00', $domain->createdAt);
+        $this->assertSame(5, $domain->id);
+        $this->assertSame('example.com', $domain->domainName);
+        $this->assertSame('verified', $domain->verificationStatus);
+        $this->assertFalse($domain->isDefault);
+        $this->assertSame(3, $domain->totalSent);
     }
 
     public function test_is_verified(): void
     {
-        $domain = new Domain('example.com', 'verified', '');
+        $domain = new Domain(1, 'example.com', 'verified');
 
         $this->assertTrue($domain->isVerified());
         $this->assertFalse($domain->isPending());
@@ -115,20 +152,9 @@ class DomainTest extends TestCase
 
     public function test_is_pending(): void
     {
-        $domain = new Domain('example.com', 'pending', '');
+        $domain = new Domain(1, 'example.com', 'pending');
 
         $this->assertFalse($domain->isVerified());
         $this->assertTrue($domain->isPending());
-    }
-
-    public function test_to_array(): void
-    {
-        $domain = new Domain('example.com', 'verified', '2024-01-01');
-
-        $this->assertEquals([
-            'domain_name' => 'example.com',
-            'verification_status' => 'verified',
-            'created_at' => '2024-01-01',
-        ], $domain->toArray());
     }
 }

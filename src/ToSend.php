@@ -2,6 +2,7 @@
 
 namespace ToSend\Laravel;
 
+use ToSend\Laravel\Concerns\MakesHttpRequests;
 use ToSend\Laravel\Contracts\ToSendClient;
 use ToSend\Laravel\Data\Email;
 use ToSend\Laravel\Data\EmailResponse;
@@ -11,6 +12,8 @@ use ToSend\Laravel\Exceptions\ToSendException;
 
 class ToSend implements ToSendClient
 {
+    use MakesHttpRequests;
+
     protected string $apiKey;
     protected string $baseUrl;
     protected int $timeout;
@@ -160,42 +163,17 @@ class ToSend implements ToSendClient
      */
     protected function request(string $method, string $endpoint, array $data = []): array
     {
-        $url = $this->baseUrl . $endpoint;
-
-        $ch = curl_init();
-
         $headers = [
             'Authorization: Bearer ' . $this->apiKey,
             'Content-Type: application/json',
             'Accept: application/json',
         ];
 
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-
-        if ($method === 'POST') {
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        }
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-
-        curl_close($ch);
-
-        if ($error) {
-            throw new ToSendException('cURL error: ' . $error);
-        }
-
-        $decoded = json_decode($response, true) ?? [];
-
-        if ($httpCode >= 400) {
-            throw ToSendException::fromResponse($decoded, $httpCode);
-        }
-
-        return $decoded;
+        return $this->performHttpRequest(
+            $method,
+            $this->baseUrl . $endpoint,
+            $headers,
+            $method === 'POST' ? $data : null
+        );
     }
 }

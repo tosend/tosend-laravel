@@ -16,6 +16,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | ToSend Admin API Key
+    |--------------------------------------------------------------------------
+    |
+    | Optional. Only needed for the Admin API client (ToSendAdmin), which
+    | manages domains, client teams, logs, webhooks and sending keys. Admin
+    | keys start with 'tsend_admin_' and are created on your main account in
+    | the dashboard under API Keys -> Admin API. Leave unset if you only send.
+    |
+    */
+
+    'admin_key' => env('TOSEND_ADMIN_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
     | API Base URL
     |--------------------------------------------------------------------------
     |
