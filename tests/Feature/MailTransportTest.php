@@ -177,7 +177,11 @@ class MailTransportTest extends TestCase
 
         $payload = $this->sendAndCapture($email);
 
-        $contentId = substr($cid, 4);
+        // Laravel 11+ returns cid:<generated id>; Laravel 10 returns
+        // cid:<file name>, which the transport rewrites. Either way the HTML
+        // must point at exactly the content_id that is sent.
+        $contentId = $payload['attachments'][0]['content_id'] ?? '';
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{32}@symfony$/', $contentId);
         $this->assertSame([[
             'name' => 'logo.png',
             'type' => 'image/png',
