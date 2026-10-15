@@ -99,10 +99,13 @@ class ToSendTransport extends AbstractTransport
             }
         }
 
-        // Add attachments
-        $attachments = $this->getAttachments($email);
+        // Add attachments (may rewrite cid: references in the HTML)
+        [$attachments, $html] = $this->getAttachments($email, $payload['html'] ?? null);
         if (!empty($attachments)) {
             $payload['attachments'] = $attachments;
+        }
+        if ($html !== null) {
+            $payload['html'] = $html;
         }
 
         // Add custom headers
@@ -149,21 +152,78 @@ class ToSendTransport extends AbstractTransport
         }, $addresses);
     }
 
-    protected function getAttachments(Email $email): array
+    /**
+     * Attachments in the API's shape, plus the HTML with cid: references
+     * pointing at real Content-IDs.
+     *
+     * Inline images follow Symfony's own rule (Email::prepareParts): a part is
+     * inline when the HTML references it as cid:<name> or cid:<content id>,
+     * or when it was added as inline. Laravel's embed() writes the content id;
+     * Symfony's embed($data, 'logo') lets you write cid:logo, which Symfony
+     * rewrites only while building MIME, so it is rewritten here instead.
+     *
+     * @return array{0: array, 1: ?string}
+     */
+    protected function getAttachments(Email $email, ?string $html): array
     {
         $attachments = [];
+        $referenced = $this->cidReferences($html);
 
         foreach ($email->getAttachments() as $attachment) {
-            if ($attachment instanceof DataPart) {
-                $attachments[] = [
-                    'name' => $attachment->getFilename() ?? 'attachment',
-                    'type' => $attachment->getContentType() ?? 'application/octet-stream',
-                    'content' => base64_encode($attachment->getBody()),
-                ];
+            if (!$attachment instanceof DataPart) {
+                continue;
+            }
+
+            $item = [
+                'name' => $attachment->getFilename() ?? 'attachment',
+                'type' => $attachment->getContentType() ?? 'application/octet-stream',
+                'content' => base64_encode($attachment->getBody()),
+            ];
+
+            $name = $attachment->getName();
+            $byName = $name !== null && $name !== '' && isset($referenced[$name]);
+            $byId = $attachment->hasContentId() && isset($referenced[$attachment->getContentId()]);
+
+            if ($byName || $byId || $attachment->getDisposition() === 'inline') {
+                $contentId = $attachment->getContentId();
+                if ($byName && $name !== $contentId) {
+                    $html = str_replace('cid:' . $name, 'cid:' . $contentId, $html);
+                }
+                $item['content_id'] = $contentId;
+            }
+
+            $attachments[] = $item;
+        }
+
+        return [$attachments, $html];
+    }
+
+    /**
+     * The names the HTML references as cid:..., keyed for lookup. Same
+     * patterns as Symfony's Email::prepareParts().
+     *
+     * @return array<string, true>
+     */
+    protected function cidReferences(?string $html): array
+    {
+        if ($html === null || $html === '') {
+            return [];
+        }
+
+        $names = [];
+        foreach ([
+            '<img\s+[^>]*src\s*=\s*(?:([\'"])cid:(.+?)\\1|cid:([^>\s]+))',
+            '<\w+\s+[^>]*background\s*=\s*(?:([\'"])cid:(.+?)\\1|cid:([^>\s]+))',
+        ] as $regex) {
+            preg_match_all('/' . $regex . '/i', $html, $matches);
+            foreach (array_merge($matches[2], $matches[3]) as $name) {
+                if ($name !== '') {
+                    $names[$name] = true;
+                }
             }
         }
 
-        return $attachments;
+        return $names;
     }
 
     protected function getCustomHeaders(Email $email): array

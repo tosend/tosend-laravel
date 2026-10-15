@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-15
+
+### Added
+
+- Inline images: `Attachment` takes an optional `contentId` (also on `fromPath`, `fromContent` and `fromBase64`), sent as `content_id`.
+- `ToSendAdmin::createTeam($name, $sesRegion)`: create a team in `'eu-central-1'` (default `'us-east-1'`).
+
+### Fixed
+
+- The mail driver now sends images added with `embed()`/`embedData()` (or referenced from the HTML as `cid:`) inline, instead of as plain attachments that showed as broken images.
+
+### Changed
+
+- `AccountInfo::$bounceRate` and `$complaintRate` read `0` for a sending key: `GET /v2/info` no longer returns them there. `ToSendAdmin::getInfo()` returns the real 30-day rates.
+
 ## [1.3.0] - 2026-09-26
 
 ### Added

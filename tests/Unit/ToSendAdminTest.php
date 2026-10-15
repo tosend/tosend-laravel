@@ -122,6 +122,19 @@ class ToSendAdminTest extends TestCase
         $this->assertSame('tsend_x', $key['api_key']);
     }
 
+    public function test_create_team_sends_the_region_only_when_given(): void
+    {
+        $admin = new RecordingAdmin(self::KEY);
+        $admin->reply = ['data' => ['id' => 8, 'name' => 'Clients EU', 'status' => 'active', 'ses_region' => 'eu-central-1']];
+
+        $team = $admin->createTeam('Clients EU', 'eu-central-1');
+        $admin->createTeam('Clients');
+
+        $this->assertSame(['name' => 'Clients EU', 'ses_region' => 'eu-central-1'], $admin->calls[0]['body']);
+        $this->assertSame(['name' => 'Clients'], $admin->calls[1]['body']);
+        $this->assertSame('eu-central-1', $team['ses_region']);
+    }
+
     public function test_update_team_uses_put(): void
     {
         $admin = new RecordingAdmin(self::KEY);

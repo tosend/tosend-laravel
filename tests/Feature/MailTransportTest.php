@@ -153,4 +153,67 @@ class MailTransportTest extends TestCase
 
         $this->assertEquals('tosend', (string) $transport);
     }
+
+    /** Capture the payload the transport hands to the client. */
+    private function sendAndCapture(Email $email): array
+    {
+        $captured = null;
+        $mockClient = Mockery::mock(ToSendClient::class);
+        $mockClient->shouldReceive('send')->once()->with(Mockery::on(function ($payload) use (&$captured) {
+            $captured = $payload;
+            return true;
+        }))->andReturn(new EmailResponse('test-message-id'));
+
+        (new ToSendTransport($mockClient, []))->send($email);
+
+        return $captured;
+    }
+
+    public function test_laravel_embed_data_is_sent_inline_with_its_content_id(): void
+    {
+        $email = (new Email())->from('sender@example.com')->to('recipient@example.com')->subject('Inline');
+        $cid = (new Message($email))->embedData('png-bytes', 'logo.png', 'image/png');
+        $email->html('<p><img src="' . $cid . '"></p>');
+
+        $payload = $this->sendAndCapture($email);
+
+        $contentId = substr($cid, 4);
+        $this->assertSame([[
+            'name' => 'logo.png',
+            'type' => 'image/png',
+            'content' => base64_encode('png-bytes'),
+            'content_id' => $contentId,
+        ]], $payload['attachments']);
+        $this->assertSame('<p><img src="cid:' . $contentId . '"></p>', $payload['html']);
+    }
+
+    public function test_symfony_embed_by_name_is_rewritten_to_the_content_id(): void
+    {
+        $email = (new Email())->from('sender@example.com')->to('recipient@example.com')->subject('Inline')
+            ->embed('png-bytes', 'logo', 'image/png')
+            ->html('<p><img src="cid:logo"></p>');
+
+        $payload = $this->sendAndCapture($email);
+
+        $contentId = $payload['attachments'][0]['content_id'] ?? null;
+        $this->assertNotNull($contentId);
+        $this->assertNotSame('logo', $contentId);
+        $this->assertSame('<p><img src="cid:' . $contentId . '"></p>', $payload['html']);
+    }
+
+    public function test_regular_attachment_has_no_content_id(): void
+    {
+        $email = (new Email())->from('sender@example.com')->to('recipient@example.com')->subject('Invoice')
+            ->attach('pdf-bytes', 'invoice.pdf', 'application/pdf')
+            ->html('<p>Invoice attached</p>');
+
+        $payload = $this->sendAndCapture($email);
+
+        $this->assertSame([[
+            'name' => 'invoice.pdf',
+            'type' => 'application/pdf',
+            'content' => base64_encode('pdf-bytes'),
+        ]], $payload['attachments']);
+        $this->assertSame('<p>Invoice attached</p>', $payload['html']);
+    }
 }

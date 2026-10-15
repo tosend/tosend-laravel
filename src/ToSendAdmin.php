@@ -294,10 +294,20 @@ class ToSendAdmin
         return $this->data($this->request('GET', '/v2/teams'));
     }
 
-    /** Only the parent account can create teams, so do not use forAccount(). */
-    public function createTeam(string $name): array
+    /**
+     * Only the parent account can create teams, so do not use forAccount().
+     *
+     * @param string|null $sesRegion 'us-east-1' (default) or 'eu-central-1'.
+     *                               Fixed for the life of the team.
+     */
+    public function createTeam(string $name, ?string $sesRegion = null): array
     {
-        return $this->data($this->request('POST', '/v2/teams', ['name' => $name]));
+        $body = ['name' => $name];
+        if ($sesRegion !== null) {
+            $body['ses_region'] = $sesRegion;
+        }
+
+        return $this->data($this->request('POST', '/v2/teams', $body));
     }
 
     /**

@@ -20,6 +20,20 @@ class AttachmentTest extends TestCase
         $this->assertEquals(base64_encode('test content'), $attachment->content);
     }
 
+    public function test_content_id_makes_an_inline_attachment(): void
+    {
+        $inline = Attachment::fromContent('png-bytes', 'logo.png', 'image/png', 'logo@acme.com');
+        $plain = Attachment::fromContent('pdf-bytes', 'a.pdf', 'application/pdf');
+
+        $this->assertSame([
+            'content' => base64_encode('png-bytes'),
+            'name' => 'logo.png',
+            'type' => 'image/png',
+            'content_id' => 'logo@acme.com',
+        ], $inline->toArray());
+        $this->assertArrayNotHasKey('content_id', $plain->toArray());
+    }
+
     public function test_from_content_encodes_to_base64(): void
     {
         $attachment = Attachment::fromContent(

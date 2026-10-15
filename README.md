@@ -147,7 +147,6 @@ echo $info->id;
 echo $info->status;           // 'active'
 echo $info->creditBalance;    // null means the account does not consume credits
 echo $info->limitPerSecond;
-echo $info->bounceRate;       // a fraction between 0 and 1, not a percentage
 
 foreach ($info->domains as $domain) {
     echo $domain->domainName . ': ' . $domain->verificationStatus;
@@ -192,7 +191,7 @@ $client->send([
 ]);
 ```
 
-Also available: `getInfo`, `listDomains`, `deleteDomain`, `listEmails`, `getEmail`, `listSuppressions`, `deleteSuppression`, `listWebhooks`, `createWebhook`, `updateWebhook`, `deleteWebhook`, `listSendingKeys`, `deleteSendingKey`, `listTeams`, `createTeam`, `updateTeam` and `batch`. List methods take `page` and `per_page` and return `data`, `total`, `page` and `per_page`. Resolving `ToSendAdmin` without `TOSEND_ADMIN_KEY` set throws a `ToSendException`; the sending client is unaffected.
+Also available: `getInfo`, `listDomains`, `deleteDomain`, `listEmails`, `getEmail`, `listSuppressions`, `deleteSuppression`, `listWebhooks`, `createWebhook`, `updateWebhook`, `deleteWebhook`, `listSendingKeys`, `deleteSendingKey`, `listTeams`, `createTeam` (`createTeam('Acme', 'eu-central-1')` for an EU team; the region can't be changed later), `updateTeam` and `batch`. List methods take `page` and `per_page` and return `data`, `total`, `page` and `per_page`. Resolving `ToSendAdmin` without `TOSEND_ADMIN_KEY` set throws a `ToSendException`; the sending client is unaffected.
 
 ## Laravel Mail Integration
 
@@ -302,6 +301,17 @@ $attachment = Attachment::fromBase64(
     type: 'image/png'
 );
 ```
+
+### Inline Images
+
+Pass a `contentId` and reference it from the HTML with `cid:`:
+
+```php
+$logo = Attachment::fromPath('/path/to/logo.png', contentId: 'logo@yourdomain.com');
+// HTML: <img src="cid:logo@yourdomain.com">
+```
+
+With Laravel's mail driver, `$message->embed()` and `embedData()` in your views just work: the images are sent inline.
 
 ## Error Handling
 
